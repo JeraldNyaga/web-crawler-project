@@ -2,7 +2,7 @@
 Tests for crawler functionality.
 """
 import pytest
-from datetime import datetime
+
 
 from crawler.models import Book, CrawlState
 from crawler.utils import (
