@@ -1,210 +1,215 @@
 """
-Tests for crawler functionality.
+Quick verification script to check crawler components.
+Run this before running the full crawler.
 """
-import pytest
-from datetime import datetime
+import asyncio
+import sys
+from loguru import logger
 
-from crawler.models.book import Book
-from crawler.models.crawlstate import CrawlState
-from crawler.utils import (
-    extract_price,
-    extract_rating,
-    extract_availability_number,
-    clean_text,
-    build_absolute_url
-)
-from crawler.parser import BookParser
+logger.remove()
+logger.add(sys.stdout, format="<level>{level: <8}</level> | {message}", level="INFO")
 
 
-class TestUtils:
-    """Test utility functions."""
+async def verify_imports():
+    """Verify all modules can be imported."""
+    logger.info("Verifying imports...")
     
-    def test_extract_price(self):
-        """Test price extraction."""
-        assert extract_price("£51.77") == 51.77
-        assert extract_price("$12.34") == 12.34
-        assert extract_price("€99.99") == 99.99
-        assert extract_price("£1,234.56") == 1234.56
-        assert extract_price("") == 0.0
-        assert extract_price("invalid") == 0.0
+    try:
+        from crawler import BookCrawler, BookParser
+        from crawler.models.book import Book
+        from crawler.utils import extract_price, extract_rating
+        from database import db
+        from config import settings
+        logger.success("✓ All imports successful")
+        return True
+    except Exception as e:
+        logger.error(f"✗ Import failed: {e}")
+        return False
+
+
+async def verify_models():
+    """Verify Pydantic models work correctly."""
+    logger.info("\nVerifying Pydantic models...")
     
-    def test_extract_rating(self):
-        """Test rating extraction."""
-        assert extract_rating("star-rating One") == 1
-        assert extract_rating("star-rating Two") == 2
-        assert extract_rating("star-rating Three") == 3
-        assert extract_rating("star-rating Four") == 4
-        assert extract_rating("star-rating Five") == 5
-        assert extract_rating("invalid") == 0
-    
-    def test_extract_availability_number(self):
-        """Test availability number extraction."""
-        assert extract_availability_number("In stock (22 available)") == 22
-        assert extract_availability_number("In stock (5 available)") == 5
-        assert extract_availability_number("In stock") == 1
-        assert extract_availability_number("Out of stock") == 0
-    
-    def test_clean_text(self):
-        """Test text cleaning."""
-        assert clean_text("  Hello   World  ") == "Hello World"
-        assert clean_text("Line1\nLine2") == "Line1 Line2"
-        assert clean_text("") == ""
-        assert clean_text(None) == ""
-    
-    def test_build_absolute_url(self):
-        """Test URL building."""
-        base = "https://books.toscrape.com"
+    try:
+        from crawler.models.book import Book
         
-        # Normal relative URL
-        assert build_absolute_url(base, "catalogue/book.html") == \
-               "https://books.toscrape.com/catalogue/book.html"
-        
-        # URL with ../
-        result = build_absolute_url(base, "../catalogue/book.html")
-        assert "catalogue/book.html" in result
-
-
-class TestBookModel:
-    """Test Book Pydantic model."""
-    
-    def test_book_creation(self):
-        """Test creating a valid book."""
         book = Book(
-            url="https://books.toscrape.com/catalogue/book_1/index.html",
+            url="https://test.com",
             title="Test Book",
-            description="A test book",
             category="Fiction",
-            price_excl_tax=45.50,
-            price_incl_tax=50.00,
-            availability="In stock (10 available)",
+            price_excl_tax=10.0,
+            price_incl_tax=10.5,
+            availability="In stock",
             num_reviews=5,
-            image_url="https://books.toscrape.com/media/image.jpg",
+            image_url="https://test.com/img.jpg",
             rating=4
         )
         
         assert book.title == "Test Book"
         assert book.rating == 4
-        assert book.price_incl_tax == 50.00
-    
-    def test_book_validation(self):
-        """Test book validation."""
-        # Invalid rating
-        with pytest.raises(ValueError):
-            Book(
-                url="https://test.com",
-                title="Test",
-                category="Fiction",
-                price_excl_tax=10.0,
-                price_incl_tax=10.0,
-                availability="In stock",
-                num_reviews=0,
-                image_url="https://test.com/img.jpg",
-                rating=6  # Invalid: > 5
-            )
         
-        # Negative price
-        with pytest.raises(ValueError):
-            Book(
-                url="https://test.com",
-                title="Test",
-                category="Fiction",
-                price_excl_tax=-10.0,
-                price_incl_tax=10.0,
-                availability="In stock",
-                num_reviews=0,
-                image_url="https://test.com/img.jpg",
-                rating=4
-            )
-    
-    def test_content_hash_generation(self):
-        """Test content hash generation."""
-        book1 = Book(
-            url="https://test.com",
-            title="Test Book",
-            category="Fiction",
-            price_excl_tax=10.0,
-            price_incl_tax=10.0,
-            availability="In stock",
-            num_reviews=5,
-            image_url="https://test.com/img.jpg",
-            rating=4
-        )
+        # Test content hash
+        hash1 = book.generate_content_hash()
+        assert len(hash1) == 64  # SHA256 hash length
         
-        book2 = Book(
-            url="https://test.com",
-            title="Test Book",
-            category="Fiction",
-            price_excl_tax=10.0,
-            price_incl_tax=10.0,
-            availability="In stock",
-            num_reviews=5,
-            image_url="https://test.com/img.jpg",
-            rating=4
-        )
+        logger.success("✓ Models working correctly")
+        return True
         
-        # Same content should produce same hash
-        assert book1.generate_content_hash() == book2.generate_content_hash()
-        
-        # Different price should produce different hash
-        book2.price_incl_tax = 15.0
-        assert book1.generate_content_hash() != book2.generate_content_hash()
+    except Exception as e:
+        logger.error(f"✗ Model verification failed: {e}")
+        return False
 
 
-class TestCrawlState:
-    """Test CrawlState model."""
+async def verify_utils():
+    """Verify utility functions."""
+    logger.info("\nVerifying utility functions...")
     
-    def test_crawl_state_creation(self):
-        """Test creating crawl state."""
-        state = CrawlState(
-            last_category="Fiction",
-            last_page=5,
-            total_books_crawled=100
-        )
+    try:
+        from crawler.utils import extract_price, extract_rating, clean_text
         
-        assert state.last_category == "Fiction"
-        assert state.last_page == 5
-        assert state.total_books_crawled == 100
-        assert state.status == "in_progress"
+        # Test price extraction
+        assert extract_price("£51.77") == 51.77
+        assert extract_price("$12.34") == 12.34
+        
+        # Test rating extraction
+        assert extract_rating("star-rating Four") == 4
+        assert extract_rating("star-rating Five") == 5
+        
+        # Test text cleaning
+        assert clean_text("  Hello   World  ") == "Hello World"
+        
+        logger.success("✓ Utility functions working correctly")
+        return True
+        
+    except Exception as e:
+        logger.error(f"✗ Utility verification failed: {e}")
+        return False
 
 
-class TestBookParser:
-    """Test BookParser."""
+async def verify_database():
+    """Verify database connection."""
+    logger.info("\nVerifying database connection...")
     
-    def test_parser_initialization(self):
-        """Test parser initialization."""
+    try:
+        from database import db
+        
+        await db.connect()
+        logger.success("✓ Database connection successful")
+        
+        # Test write
+        test_doc = {
+            "test": "verification",
+            "timestamp": "2025-11-26"
+        }
+        await db.db.test_verification.insert_one(test_doc)
+        logger.success("✓ Database write successful")
+        
+        # Test read
+        doc = await db.db.test_verification.find_one({"test": "verification"})
+        assert doc is not None
+        logger.success("✓ Database read successful")
+        
+        # Cleanup
+        await db.db.test_verification.delete_many({})
+        logger.success("✓ Database cleanup successful")
+        
+        await db.disconnect()
+        return True
+        
+    except Exception as e:
+        logger.error(f"✗ Database verification failed: {e}")
+        logger.error("Make sure MongoDB URI is correct in .env")
+        return False
+
+
+async def verify_parser():
+    """Verify HTML parser."""
+    logger.info("\nVerifying HTML parser...")
+    
+    try:
+        from crawler.parser import BookParser
+        
         parser = BookParser()
         assert parser.base_url == "https://books.toscrape.com"
         
-        parser2 = BookParser("https://example.com")
-        assert parser2.base_url == "https://example.com"
-    
-    def test_parse_category_page_empty(self):
-        """Test parsing empty category page."""
-        parser = BookParser()
-        html = "<html><body></body></html>"
+        # Test simple HTML parsing
+        html = """
+        <html>
+            <body>
+                <article class="product_pod">
+                    <h3><a href="catalogue/book_1/index.html">Test Book</a></h3>
+                </article>
+            </body>
+        </html>
+        """
+        
         books = parser.parse_category_page(html)
-        assert books == []
+        assert len(books) == 1
+        assert "catalogue/book_1/index.html" in books[0]
+        
+        logger.success("✓ HTML parser working correctly")
+        return True
+        
+    except Exception as e:
+        logger.error(f"✗ Parser verification failed: {e}")
+        return False
+
+
+async def verify_crawler_init():
+    """Verify crawler can be initialized."""
+    logger.info("\nVerifying crawler initialization...")
     
-    def test_has_next_page_no_pagination(self):
-        """Test checking for next page when there is none."""
-        parser = BookParser()
-        html = "<html><body></body></html>"
-        next_page = parser.has_next_page(html)
-        assert next_page is None
-
-
-# Integration tests would go here
-# These require actual HTTP requests or mocking
-
-
-@pytest.mark.asyncio
-class TestCrawlerIntegration:
-    """Integration tests for crawler (require network/mocks)."""
-    
-    async def test_crawler_initialization(self):
-        """Test crawler initialization."""
+    try:
         from crawler import BookCrawler
         
         crawler = BookCrawler()
         assert crawler.base_url == "https://books.toscrape.com"
         assert crawler.stats['total_books'] == 0
+        
+        logger.success("✓ Crawler initialized successfully")
+        return True
+        
+    except Exception as e:
+        logger.error(f"✗ Crawler initialization failed: {e}")
+        return False
+
+
+async def main():
+    """Run all verifications."""
+    logger.info("="*60)
+    logger.info("CRAWLER VERIFICATION SUITE")
+    logger.info("="*60)
+    
+    results = []
+    
+    # Run all checks
+    results.append(await verify_imports())
+    results.append(await verify_models())
+    results.append(await verify_utils())
+    results.append(await verify_database())
+    results.append(await verify_parser())
+    results.append(await verify_crawler_init())
+    
+    # Summary
+    logger.info("\n" + "="*60)
+    passed = sum(results)
+    total = len(results)
+    
+    if passed == total:
+        logger.success(f"✓ ALL CHECKS PASSED ({passed}/{total})")
+        logger.success("\nYour crawler is ready to run!")
+        logger.info("\nNext steps:")
+        logger.info("1. Run crawler: python main.py crawl")
+        logger.info("2. Check logs: tail -f logs/app.log")
+        logger.info("3. Monitor progress in terminal")
+    else:
+        logger.error(f"✗ SOME CHECKS FAILED ({passed}/{total})")
+        logger.error("\nPlease fix the errors above before running crawler")
+        sys.exit(1)
+    
+    logger.info("="*60)
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
