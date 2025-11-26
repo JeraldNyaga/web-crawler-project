@@ -1,3 +1,6 @@
+from typing import Optional
+from pydantic import BaseModel, Field
+from book import Book
 
 class BookParseResult(BaseModel):
     """Result of parsing a book page."""

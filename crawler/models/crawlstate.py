@@ -1,3 +1,7 @@
+from typing import Optional
+from datetime import datetime
+from pydantic import BaseModel, Field
+
 class CrawlState(BaseModel):
     """Model for tracking crawler state (for resume functionality)."""
     

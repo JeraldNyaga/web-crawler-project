@@ -1,3 +1,9 @@
+from typing import Optional
+from datetime import datetime
+from pydantic import BaseModel, Field, field_validator
+import hashlib
+import json
+
 class Book(BaseModel):
     """Book data model with validation."""
     
