@@ -5,7 +5,8 @@ from typing import Optional, List
 from bs4 import BeautifulSoup
 from loguru import logger
 
-from .models.book import Book, BookParseResult
+from .models.book import Book
+from .models.bookparseresult import BookParseResult
 from .utils import (
     extract_price,
     extract_rating,
