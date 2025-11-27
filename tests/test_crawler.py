@@ -4,7 +4,8 @@ Tests for crawler functionality.
 import pytest
 
 
-from crawler.models import Book, CrawlState
+from crawler.models.book import Book
+from crawler import CrawlState
 from crawler.utils import (
     extract_price,
     extract_rating,
