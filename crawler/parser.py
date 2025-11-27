@@ -6,7 +6,7 @@ from bs4 import BeautifulSoup
 from loguru import logger
 
 from .models.book import Book
-from .models.bookparseresult import BookParseResult
+from .models.book_parse_result import BookParseResult
 from .utils import (
     extract_price,
     extract_rating,

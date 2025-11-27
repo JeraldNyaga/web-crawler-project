@@ -1,8 +1,8 @@
 """Crawler package."""
 from .scraper import BookCrawler, run_crawler
 from .models.book import Book
-from .models.crawlstate import CrawlState
-from .models.bookparseresult import BookParseResult
+from .models.crawl_state import CrawlState
+from .models.book_parse_result import BookParseResult
 from .parser import BookParser
 
 __all__ = [

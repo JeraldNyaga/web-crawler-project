@@ -7,7 +7,7 @@ from datetime import datetime
 import httpx
 from loguru import logger
 
-from .models.crawlstate import CrawlState
+from .models.crawl_state import CrawlState
 from .parser import BookParser
 from .utils import fetch_with_retry
 from database import db
