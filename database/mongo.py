@@ -2,10 +2,12 @@
 MongoDB database connection and operations.
 Uses Motor for async operations.
 """
+from __future__ import annotations
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 from pymongo.errors import DuplicateKeyError
 from loguru import logger
+
 from config import settings
 
 

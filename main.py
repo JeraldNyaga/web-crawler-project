@@ -66,7 +66,7 @@ async def run_crawler():
 def run_api():
     """Run the FastAPI server."""
     import uvicorn
-    from main import app
+    from api.main import app
     
     logger.info(f"Starting API server on {settings.api_host}:{settings.api_port}")
     

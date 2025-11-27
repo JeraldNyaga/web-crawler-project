@@ -3,25 +3,29 @@ Tests for API endpoints.
 """
 import pytest
 from fastapi.testclient import TestClient
+from datetime import datetime
 
 from api.main import app
 from config import settings
 
 
 # Create test client
-client = TestClient(app)
 
+@pytest.fixture(scope="function")
+def client():
+    with TestClient(app) as c:
+        yield c
 
 class TestAuthentication:
     """Test API key authentication."""
     
-    def test_missing_api_key(self):
+    def test_missing_api_key(self, client):
         """Test request without API key."""
         response = client.get("/books")
         assert response.status_code == 401
         assert "Missing API key" in response.json()['detail']
     
-    def test_invalid_api_key(self):
+    def test_invalid_api_key(self, client):
         """Test request with invalid API key."""
         response = client.get(
             "/books",
@@ -30,7 +34,7 @@ class TestAuthentication:
         assert response.status_code == 401
         assert "Invalid API key" in response.json()['detail']
     
-    def test_valid_api_key(self):
+    def test_valid_api_key(self, client):
         """Test request with valid API key."""
         # Use first valid API key from settings
         valid_key = settings.api_keys_list[0]
@@ -45,12 +49,12 @@ class TestAuthentication:
 class TestHealthEndpoint:
     """Test health check endpoint."""
     
-    def test_health_no_auth_required(self):
+    def test_health_no_auth_required(self, client):
         """Test health endpoint doesn't require authentication."""
         response = client.get("/health")
-        assert response.status_code in [200, 503]  # 503 if DB not connected
+        assert response.status_code in [200, 503]
     
-    def test_health_response_structure(self):
+    def test_health_response_structure(self, client):
         """Test health response has correct structure."""
         response = client.get("/health")
         data = response.json()
@@ -66,7 +70,7 @@ class TestHealthEndpoint:
 class TestRootEndpoint:
     """Test root endpoint."""
     
-    def test_root_endpoint(self):
+    def test_root_endpoint(self, client):
         """Test root endpoint returns API info."""
         response = client.get("/")
         assert response.status_code == 200
@@ -84,7 +88,7 @@ class TestBooksEndpoint:
         """Setup for each test."""
         self.headers = {"X-API-Key": settings.api_keys_list[0]}
     
-    def test_get_books_basic(self):
+    def test_get_books_basic(self, client):
         """Test basic books retrieval."""
         response = client.get("/books", headers=self.headers)
         
@@ -98,7 +102,7 @@ class TestBooksEndpoint:
         assert "page_size" in data
         assert "total_pages" in data
     
-    def test_get_books_with_category_filter(self):
+    def test_get_books_with_category_filter(self, client):
         """Test books filtered by category."""
         response = client.get(
             "/books?category=Fiction",
@@ -106,7 +110,7 @@ class TestBooksEndpoint:
         )
         assert response.status_code == 200
     
-    def test_get_books_with_price_filter(self):
+    def test_get_books_with_price_filter(self, client):
         """Test books filtered by price range."""
         response = client.get(
             "/books?min_price=10&max_price=50",
@@ -114,7 +118,7 @@ class TestBooksEndpoint:
         )
         assert response.status_code == 200
     
-    def test_get_books_with_rating_filter(self):
+    def test_get_books_with_rating_filter(self, client):
         """Test books filtered by rating."""
         response = client.get(
             "/books?rating=4",
@@ -122,7 +126,7 @@ class TestBooksEndpoint:
         )
         assert response.status_code == 200
     
-    def test_get_books_with_invalid_rating(self):
+    def test_get_books_with_invalid_rating(self, client):
         """Test books with invalid rating."""
         response = client.get(
             "/books?rating=6",  # Invalid: > 5
@@ -130,7 +134,7 @@ class TestBooksEndpoint:
         )
         assert response.status_code == 422  # Validation error
     
-    def test_get_books_with_sorting(self):
+    def test_get_books_with_sorting(self, client):
         """Test books with sorting."""
         response = client.get(
             "/books?sort_by=price&order=desc",
@@ -138,7 +142,7 @@ class TestBooksEndpoint:
         )
         assert response.status_code == 200
     
-    def test_get_books_with_pagination(self):
+    def test_get_books_with_pagination(self, client):
         """Test books with pagination."""
         response = client.get(
             "/books?page=1&limit=10",
@@ -150,7 +154,7 @@ class TestBooksEndpoint:
         assert data['page'] == 1
         assert data['page_size'] == 10
     
-    def test_get_books_invalid_page(self):
+    def test_get_books_invalid_page(self, client):
         """Test books with invalid page number."""
         response = client.get(
             "/books?page=0",  # Invalid: must be >= 1
@@ -166,7 +170,7 @@ class TestBookDetailEndpoint:
         """Setup for each test."""
         self.headers = {"X-API-Key": settings.api_keys_list[0]}
     
-    def test_get_book_invalid_id_format(self):
+    def test_get_book_invalid_id_format(self, client):
         """Test get book with invalid ID format."""
         response = client.get(
             "/books/invalid-id",
@@ -174,7 +178,7 @@ class TestBookDetailEndpoint:
         )
         assert response.status_code == 400
     
-    def test_get_book_not_found(self):
+    def test_get_book_not_found(self, client):
         """Test get book that doesn't exist."""
         # Valid ObjectId format but doesn't exist
         response = client.get(
@@ -192,7 +196,7 @@ class TestChangesEndpoint:
         """Setup for each test."""
         self.headers = {"X-API-Key": settings.api_keys_list[0]}
     
-    def test_get_changes_basic(self):
+    def test_get_changes_basic(self, client):
         """Test basic changes retrieval."""
         response = client.get("/changes", headers=self.headers)
         assert response.status_code == 200
@@ -201,7 +205,7 @@ class TestChangesEndpoint:
         assert "changes" in data
         assert "total" in data
     
-    def test_get_changes_with_type_filter(self):
+    def test_get_changes_with_type_filter(self, client):
         """Test changes filtered by type."""
         response = client.get(
             "/changes?change_type=price_change",
@@ -209,7 +213,7 @@ class TestChangesEndpoint:
         )
         assert response.status_code == 200
     
-    def test_get_changes_with_limit(self):
+    def test_get_changes_with_limit(self, client):
         """Test changes with custom limit."""
         response = client.get(
             "/changes?limit=50",
@@ -221,7 +225,7 @@ class TestChangesEndpoint:
 class TestRateLimiting:
     """Test rate limiting functionality."""
     
-    def test_rate_limit_headers_present(self):
+    def test_rate_limit_headers_present(self, client):
         """Test that rate limit headers are present."""
         headers = {"X-API-Key": settings.api_keys_list[0]}
         response = client.get("/books", headers=headers)
@@ -246,22 +250,15 @@ class TestRateLimiting:
 
 
 # Integration tests
-@pytest.mark.asyncio
 class TestAPIIntegration:
-    """Integration tests for API."""
-    
-    async def test_full_workflow(self):
-        """Test complete API workflow."""
+    def test_full_workflow(self, client):
         headers = {"X-API-Key": settings.api_keys_list[0]}
-        
-        # 1. Check health
+
         response = client.get("/health")
         assert response.status_code in [200, 503]
-        
-        # 2. Get books list
+
         response = client.get("/books", headers=headers)
         assert response.status_code == 200
-        
-        # 3. Get changes
+
         response = client.get("/changes", headers=headers)
         assert response.status_code == 200
