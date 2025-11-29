@@ -98,21 +98,41 @@ async def run_scheduler():
         await db.disconnect()
 
 
+async def run_scheduler_once():
+    """Run change detection once (testing mode)."""
+    from scheduler.scheduler import run_detection_once
+    from database import db
+    
+    logger.info("Running change detection once...")
+    
+    try:
+        await db.connect()
+        await run_detection_once()
+        logger.success("Change detection completed!")
+    except Exception as e:
+        logger.error(f"Change detection failed: {e}")
+        raise
+    finally:
+        await db.disconnect()
+
+
 def print_usage():
     """Print usage information."""
     usage = """
-Usage: python main.py [command]
+Usage: python main.py [command] [options]
 
 Commands:
   crawl      - Run the web crawler
   api        - Start the REST API server
   schedule   - Run the scheduler for change detection
+  detect     - Run change detection once (testing)
   help       - Show this help message
 
 Examples:
-  python main.py crawl       # Crawl the website
-  python main.py api         # Start API on port 8000
-  python main.py schedule    # Run daily scheduler
+  python main.py crawl          # Crawl the website
+  python main.py api            # Start API on port 8000
+  python main.py schedule       # Run daily scheduler (runs indefinitely)
+  python main.py detect         # Run change detection once
 
 For more information, see README.md
     """
@@ -137,6 +157,8 @@ def main():
             run_api()
         elif command == "schedule":
             asyncio.run(run_scheduler())
+        elif command == "detect":
+            asyncio.run(run_scheduler_once())
         elif command in ["help", "-h", "--help"]:
             print_usage()
         else:
