@@ -4,11 +4,12 @@ Change detection logic for monitoring book updates.
 from typing import Dict, List, Optional, Any
 from datetime import datetime
 from loguru import logger
-
+from crawler.parser import BookParser
 from database import db
+from crawler.utils import fetch_with_retry
 from crawler.models.book import Book
 from crawler.scraper import BookCrawler
-
+import httpx
 
 class ChangeDetector:
     """Detect and log changes in book data."""
@@ -311,8 +312,68 @@ class ChangeDetector:
         
         else:
             raise ValueError(f"Unsupported format: {format}")
+             
+    async def _detect_changes_in_books(self, existing_books: list[dict]):
+        """
+        Re-fetch each stored book, parse it again, compare with the DB version,
+        update changes, and log them.
 
+        - Detects changed fields (price, availability, rating, etc.)
+        - Updates DB when changes occur
+        - Logs change events in the 'changes' collection
+        """
+        parser = BookParser()
 
+        async with httpx.AsyncClient(timeout=15) as client:
+            for stored in existing_books:
+                url = stored["url"]
+
+                # 1. Re-fetch the book page
+                html = await self._fetch_and_parse_book(client, url)
+
+                if not html:
+                    self.logger.warning(f"Book unavailable or failed to fetch: {url}")
+                    continue
+
+                # 2. Parse new page content
+                parsed = parser.parse_book_page(html, url=url)
+
+                if not parsed.success or not parsed.book:
+                    self.logger.warning(f"Parser failed for: {url}")
+                    continue
+
+                new_book: Book = parsed.book
+                new_book.generate_content_hash()
+
+                # 3. Compare content hash first (fastest check)
+                if new_book.content_hash == stored.get("content_hash"):
+                    continue  # No changes at all
+
+                # 4. Field-by-field comparison
+                changes = await self.compare_and_log_changes(stored, new_book)
+
+                if changes:
+                    # 5. Update stored record in DB
+                    await self.db.update_existing_book(
+                        book_id=stored["_id"],
+                        updated_data=new_book.to_dict()
+                    )
+
+                    self.stats["total_changes"] += 1
+
+        return True
+
+    async def _fetch_and_parse_book(self, client: httpx.AsyncClient, url: str) -> str | None:
+        """
+        Fetches book HTML using retry logic.
+        Returns the HTML or None if failed.
+        """
+        try:
+            html = await fetch_with_retry(client, url)
+            return html
+        except Exception as e:
+            self.logger.error(f"Error fetching {url}: {e}")
+            return None
 async def run_change_detection():
     """Convenience function to run change detection."""
     detector = ChangeDetector()

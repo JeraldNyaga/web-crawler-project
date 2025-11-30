@@ -2,7 +2,7 @@
 Scheduler for running periodic change detection.
 """
 import asyncio
-from datetime import datetime
+from datetime import datetime, timezone
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from loguru import logger
@@ -23,7 +23,7 @@ class ChangeDetectionScheduler:
     async def run_change_detection_job(self):
         """Job that runs change detection."""
         logger.info("="*60)
-        logger.info(f"Running scheduled change detection: {datetime.utcnow()}")
+        logger.info(f"Running scheduled change detection: {datetime.now(timezone.utc)}")
         logger.info("="*60)
         
         try:
@@ -68,7 +68,7 @@ class ChangeDetectionScheduler:
         reports_dir.mkdir(exist_ok=True)
         
         # Generate filename with timestamp
-        timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+        timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
         filename = reports_dir / f"change_report_{timestamp}.{format}"
         
         # Save report
