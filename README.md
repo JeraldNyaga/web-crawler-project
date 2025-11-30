@@ -168,7 +168,7 @@ Key dependencies:
 1. **Clone repository:**
 
     ```bash
-    git clone <repo-url> web-crawler-project
+    git clone https://github.com/JeraldNyaga/web-crawler-project
     cd web-crawler-project
     ```
 
@@ -256,11 +256,7 @@ All variables have sensible defaults. See [config/settings.py](config/settings.p
 ### 1. Start MongoDB
 
 ```bash
-# Docker (recommended)
-docker run -d -p 27017:27017 --name mongodb mongo:latest
-
-# Or local MongoDB
-mongod
+# Ensure you have created a mongodb atlas account first and update .env accordingly
 ```
 
 ### 2. Verify Setup
@@ -272,8 +268,46 @@ python test_connection.py
 Expected output:
 
 ```
-✓ MongoDB connection successful
+INFO     | ==================================================
+INFO     | Web Crawler - Connection Test Suite
+INFO     | ==================================================
+INFO     |
+Testing required packages...
+SUCCESS  | ✓ fastapi              - FastAPI web framework
+SUCCESS  | ✓ httpx                - Async HTTP client
+SUCCESS  | ✓ motor                - Async MongoDB driver
+SUCCESS  | ✓ pydantic             - Data validation
+SUCCESS  | ✓ apscheduler          - Task scheduler
+SUCCESS  | ✓ loguru               - Logging
+SUCCESS  | ✓ pytest               - Testing framework
+SUCCESS  |
 ✓ All packages installed correctly!
+INFO     |
+Testing configuration...
+SUCCESS  | ✓ MONGODB_URI configured
+SUCCESS  | ✓ API_SECRET_KEY configured
+SUCCESS  | ✓ API_KEYS configured
+SUCCESS  | ✓ Configuration loaded successfully!
+INFO     | Testing MongoDB connection...
+INFO     | Connection URI: mongodb+srv://...
+SUCCESS  | ✓ MongoDB connection successful!
+INFO     | ✓ Database: books_crawler
+INFO     | ✓ Existing collections: ['test_connection', 'crawl_state', 'changes', 'books', 'test_verification']
+SUCCESS  | ✓ Write test successful! Inserted ID: ...
+SUCCESS  | ✓ Read test successful! Document: {'_id': ObjectId('...'), 'test': 'connection', 'status': 'success'}
+INFO     | ✓ Test document cleaned up
+SUCCESS  | ✓ All MongoDB tests passed!
+INFO     |
+==================================================
+SUCCESS  | ✓ ALL TESTS PASSED!
+SUCCESS  |
+You're ready to start development!
+INFO     |
+Next steps:
+INFO     | 1. Run crawler: python main.py crawl
+INFO     | 2. Start API: python main.py api
+INFO     | 3. Run scheduler: python main.py schedule
+INFO     | ==================================================
 ```
 
 ### 3. Run Crawler
@@ -311,7 +345,7 @@ In another terminal:
 python main.py schedule
 ```
 
-This runs change detection daily at the configured time (default: 02:00 UTC).
+This runs change detection daily at the configured time (default: 23:15 EAT).
 
 ---
 
@@ -761,18 +795,7 @@ Failed to connect to MongoDB: connection refused
 
 1. Ensure MongoDB is running:
 
-    ```bash
-    docker ps | grep mongodb
-    # or
-    ps aux | grep mongod
-    ```
-
 2. Check `MONGODB_URI` in `.env`:
-
-    ```bash
-    # For local MongoDB
-    MONGODB_URI=mongodb://localhost:27017
-    ```
 
 3. Test connectivity:
     ```bash
@@ -799,10 +822,6 @@ Failed to connect to MongoDB: connection refused
     ```
 
 2. Check logs:
-
-    ```bash
-    tail -f logs/app.log
-    ```
 
 3. Ensure DB connection started:
     - API should log `Connected to MongoDB` on startup
@@ -935,8 +954,6 @@ git push origin feature-branch
 
 ---
 
-## Production Deployment
-
 ### Prerequisites
 
 -   MongoDB hosted and accessible
@@ -977,51 +994,6 @@ git push origin feature-branch
     gunicorn -w 4 -k uvicorn.workers.UvicornWorker \
              --bind 0.0.0.0:8000 \
              api.main:app
-    ```
-
-5. **Or use systemd service:**
-
-    ```ini
-    # /etc/systemd/system/books-api.service
-    [Unit]
-    Description=Books Crawler API
-    After=network.target
-
-    [Service]
-    Type=notify
-    User=www-data
-    WorkingDirectory=/opt/web-crawler-project
-    ExecStart=/opt/web-crawler-project/venv/bin/uvicorn \
-              api.main:app \
-              --host 0.0.0.0 \
-              --port 8000
-    Restart=always
-
-    [Install]
-    WantedBy=multi-user.target
-    ```
-
-    Then:
-
-    ```bash
-    sudo systemctl daemon-reload
-    sudo systemctl start books-api
-    sudo systemctl enable books-api
-    ```
-
-6. **Setup reverse proxy (Nginx):**
-
-    ```nginx
-    server {
-        listen 80;
-        server_name api.example.com;
-
-        location / {
-            proxy_pass http://127.0.0.1:8000;
-            proxy_set_header Host $host;
-            proxy_set_header X-Real-IP $remote_addr;
-        }
-    }
     ```
 
 ---
